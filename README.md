@@ -1,39 +1,43 @@
-# Semantic Segmentation for Polyp Detection in Colonoscopy Images
+# Polyp Segmentation in Colonoscopy Frames with U-Net
 
-## Problem Statement
+A U-Net (TensorFlow/Keras) that segments polyps pixel by pixel in colonoscopy frames from the CVC-ClinicDB dataset. This is a learning project: the model is undertrained and its results are weak (see Results and Limitations). It is not a medical device.
 
-The Endoscopic Vision Challenge aims to address the critical issue of polyp detection in colonoscopy videos with the primary goal of reducing the miss-rate of polyp detection during colonoscopy procedures and lowering the associated mortality rate of colon cancer.
+## Data
 
-### Polyp Detection
-- **Task Description:** Participants are expected to design a method that can determine whether a polyp is present in an image or video frame and calculate the time delay between the appearance of the polyp and its first detection.
-- **Challenge:** Detecting polyps is crucial for timely intervention. The challenge here is to develop algorithms that can reliably detect the presence of polyps as soon as they appear in the video, minimizing any delay.
+[CVC-ClinicDB](https://polyp.grand-challenge.org/CVCClinicDB/): colonoscopy frames (`Original/*.tif`) with polyp masks (`GroundTruth/*.tif`). The dataset is not included here; download it from the link above. Its terms restrict use to research and education, and commercial use is forbidden. The weights in `files/model.h5` were trained on it, so the same restriction applies to them.
 
-## U-Net Model Architecture
+If you use the data, cite: Bernal J., Sánchez F. J., Fernández-Esparrach G., Gil D., Rodríguez C., Vilariño F. (2015). WM-DOVA maps for accurate polyp highlighting in colonoscopy: Validation vs. saliency maps from physicians. *Computerized Medical Imaging and Graphics*, 43, 99–111.
 
-The "U-Net" is a neural network architecture commonly used in computer vision for tasks like image segmentation and medical image analysis. Originally designed for biomedical image segmentation, it has found applications in various areas of image processing.
+## Method
 
-### Key Features of U-Net
-1. **Encoder-Decoder Structure:** U-Net has a distinctive "U" shape in its architecture, comprising an encoder and a decoder.
-2. **Encoder:** This part captures features and patterns from the input image, identifying shapes, edges, and important details as it goes deeper.
-3. **Decoder:** The decoder uses the learned features to create a detailed segmentation map, gradually upsampling feature maps to match the input image's size.
-4. **Skip Connections:** U-Net employs skip connections to directly pass information from the encoder to corresponding decoder layers, preserving fine details.
-5. **Output:** The final output is a segmentation map, where each pixel is classified into a specific category, e.g., in medical imaging, differentiating organs or tumors.
+- Images and masks resized to 256 × 256, scaled to [0, 1].
+- Split 368 / 122 / 122 (train / validation / test) with `train_test_split(random_state=42)`. Frames were split at random, not by video sequence.
+- U-Net, binary cross-entropy, Adam (lr 1e-4), batch 8, 20 epochs, `ReduceLROnPlateau`. Training logs: `files/data.csv`, TensorBoard logs in `logs/`.
 
-U-Net excels at image segmentation, outlining and identifying specific objects or regions within an image. Its ability to capture fine details makes it effective for tasks like biomedical image segmentation, requiring precise structure delineation.
+## Results
 
-## Semantic Segmentation
+Test set (122 frames), from `Notebook.ipynb` cell 17:
 
-Semantic segmentation is a computer vision task that assigns a class label to every pixel in an image, categorizing each pixel into predefined classes or categories. Unlike image classification, which labels an entire image, semantic segmentation labels each pixel according to the object or region it belongs to.
+| Metric | Value |
+| --- | --- |
+| Pixel accuracy | 0.932 |
+| Recall | 0.495 |
+| Precision | 0.712 |
+| Soft IoU (see note) | 0.182 |
 
-## Performance Metrics
+Final-epoch training vs validation (from `files/data.csv`): recall 0.836 vs 0.461 and soft IoU 0.297 vs 0.164, so the model overfits.
 
-When evaluating a U-Net model for semantic segmentation of polyps in medical images, consider key performance metrics to assess accuracy and effectiveness:
+**Note on IoU.** The `iou` metric in the notebook multiplies the mask by the predicted probabilities without thresholding them, so it is a "soft" IoU and is lower than the standard thresholded IoU (prediction > 0.5) used in papers. The standard IoU and Dice have not been computed yet. Pixel accuracy is high mainly because most pixels are background.
 
-1. **Intersection over Union (IoU) or Jaccard Index**: Measures overlap between predicted and ground truth regions. Higher IoU indicates better segmentation accuracy.
-2. **Dice Coefficient**: Another measure of overlap between predicted and ground truth regions, similar to F1 score. Higher Dice coefficient indicates better segmentation.
-3. **Pixel Accuracy**: Measures the percentage of correctly classified pixels in the entire image.
-4. **Mean Intersection over Union (mIoU)**: Calculates average IoU across all classes, providing an overall measure of segmentation performance.
-5. **F1-Score**: Balances precision and recall, useful for false positive and false negative management.
-6. **Sensitivity and Specificity**: Important in medical imaging, measures the ability to correctly identify polyps and non-polyp regions.
-7. **Receiver Operating Characteristic (ROC) Curve and Area Under the Curve (AUC)**: Assess trade-off between true positive rate and false positive rate at different segmentation thresholds.
-8. **Precision-Recall Curve (PR Curve)**: Shows trade-off between precision and recall at different thresholds, particularly useful for class imbalances.
+## Limitations and next steps
+
+- Compute thresholded IoU and Dice on the test set; report per-image distributions, not only the mean.
+- Split by video sequence so frames from one polyp are not in both train and test.
+- Add augmentation and a Dice or Dice + BCE loss; train longer with early stopping on validation Dice.
+- Compare with a published baseline on the same split before claiming any improvement.
+
+## How to run
+
+1. Download CVC-ClinicDB and place `Original/` and `GroundTruth/` under `CVC-ClinicDB/`.
+2. `pip install tensorflow opencv-python scikit-learn numpy pandas tqdm`
+3. Run `Notebook.ipynb` top to bottom.
